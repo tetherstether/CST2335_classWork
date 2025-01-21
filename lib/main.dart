@@ -7,6 +7,7 @@ void main() {
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
 
+
   // This widget is the root of your application.
   @override
   Widget build(BuildContext context) {
@@ -57,6 +58,7 @@ class MyHomePage extends StatefulWidget {
 class _MyHomePageState extends State<MyHomePage> {
   var _counter = 0.0; //initializing as 0.0
   var myFontSize = 30.0; //initialized myFontSize to 30
+  var isChecked = false;
 
   void _incrementCounter() {
     setState(() {
@@ -120,6 +122,14 @@ class _MyHomePageState extends State<MyHomePage> {
             Text(
                 _counter.toStringAsFixed(3), // Display with 3 decimal places
               style: TextStyle(fontSize: myFontSize)
+            ),
+            Switch(
+                value: isChecked,
+                onChanged: (newValue) {
+                  setState(() {
+                    isChecked = newValue;
+                  });
+                }
             ),
         Slider(
           value: myFontSize,
