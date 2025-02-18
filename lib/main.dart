@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:encrypted_shared_preferences/encrypted_shared_preferences.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 void main() async {
-  WidgetsFlutterBinding.ensureInitialized(); // Ensure Flutter is initialized
+  WidgetsFlutterBinding.ensureInitialized();
   final EncryptedSharedPreferences encryptedPrefs = EncryptedSharedPreferences();
-  runApp(MyApp(encryptedPrefs: encryptedPrefs)); // Pass EncryptedSharedPreferences to MyApp
+  runApp(MyApp(encryptedPrefs: encryptedPrefs));
 }
 
 class MyApp extends StatelessWidget {
@@ -14,11 +15,9 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Lab 2 Flutter App',
-      home: LoginPage(encryptedPrefs: encryptedPrefs), // Pass EncryptedSharedPreferences to LoginPage
-      theme: ThemeData(
-        primarySwatch: Colors.blue,
-      ),
+      title: 'Lab 5 Flutter App',
+      home: LoginPage(encryptedPrefs: encryptedPrefs),
+      theme: ThemeData(primarySwatch: Colors.blue),
     );
   }
 }
@@ -32,12 +31,8 @@ class LoginPage extends StatefulWidget {
 }
 
 class LoginPageState extends State<LoginPage> {
-  // Controllers to handle text input
   final TextEditingController _loginController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
-
-  // Variable to store the image path
-  String imageSource = "images/question-mark.png"; // Default image
 
   @override
   void initState() {
@@ -45,130 +40,126 @@ class LoginPageState extends State<LoginPage> {
     _loadSavedCredentials();
   }
 
-  // Function to load saved credentials
   void _loadSavedCredentials() async {
     final savedLogin = await widget.encryptedPrefs.getString('login');
     final savedPassword = await widget.encryptedPrefs.getString('password');
-
-    // Check if the saved values are not null
     if (savedLogin != null && savedPassword != null) {
       _loginController.text = savedLogin;
       _passwordController.text = savedPassword;
-
-      // Show SnackBar with Undo option only if credentials are loaded
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Previous login credentials loaded.'),
-            action: SnackBarAction(
-              label: 'Undo',
-              onPressed: () {
-                setState(() {
-                  _loginController.text = '';
-                  _passwordController.text = '';
-                });
-              },
-            ),
-          ),
-        );
-      }
     }
   }
 
-  // Function to handle login logic
   void _login() {
-    String password = _passwordController.text;
-
-    setState(() {
-      if (password == "QWERTY123") {
-        imageSource = "images/idea.png";
-      } else {
-        imageSource = "images/stop.png";
-      }
-    });
-
-    // Show AlertDialog to ask if the user wants to save credentials
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: Text('Save Credentials?'),
-          content: Text('Do you want to save your login name and password?'),
-          actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.of(context).pop();
-                _saveCredentials(false); // Do not save credentials
-              },
-              child: Text('No'),
-            ),
-            TextButton(
-              onPressed: () {
-                Navigator.of(context).pop();
-                _saveCredentials(true); // Save credentials
-              },
-              child: Text('Yes'),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
-  void _saveCredentials(bool save) async {
-    if (save) {
-      await widget.encryptedPrefs.setString('login', _loginController.text);
-      await widget.encryptedPrefs.setString('password', _passwordController.text);
+    if (_passwordController.text == "QWERTY123") {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => ProfilePage(
+            loginName: _loginController.text,
+            encryptedPrefs: widget.encryptedPrefs,
+          ),
+        ),
+      );
     } else {
-      // Set the saved credentials to empty strings to clear them
-      await widget.encryptedPrefs.clear();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Invalid credentials")),
+      );
     }
   }
-
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: Text("Login Page"),
-      ),
+      appBar: AppBar(title: Text("Login Page")),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            // Login name text field
-            TextField(
-              controller: _loginController,
-              decoration: InputDecoration(
-                labelText: "Login name",
-              ),
-            ),
+            TextField(controller: _loginController, decoration: InputDecoration(labelText: "Login name")),
             SizedBox(height: 16),
-
-            // Password text field with obscure text
-            TextField(
-              controller: _passwordController,
-              obscureText: true,
-              decoration: InputDecoration(
-                labelText: "Password",
-              ),
-            ),
+            TextField(controller: _passwordController, obscureText: true, decoration: InputDecoration(labelText: "Password")),
             SizedBox(height: 16),
+            ElevatedButton(onPressed: _login, child: Text("Login")),
+          ],
+        ),
+      ),
+    );
+  }
+}
 
-            // Elevated button to trigger login
-            ElevatedButton(
-              onPressed: _login,
-              child: Text("Login"),
-            ),
-            SizedBox(height: 16),
+class ProfilePage extends StatefulWidget {
+  final String loginName;
+  final EncryptedSharedPreferences encryptedPrefs;
+  const ProfilePage({super.key, required this.loginName, required this.encryptedPrefs});
 
-            // Display the image based on password validity
-            Image.asset(
-              imageSource,
-              width: 300,
-              height: 300,
-            ),
+  @override
+  ProfilePageState createState() => ProfilePageState();
+}
+
+class ProfilePageState extends State<ProfilePage> {
+  final TextEditingController _firstNameController = TextEditingController();
+  final TextEditingController _lastNameController = TextEditingController();
+  final TextEditingController _phoneController = TextEditingController();
+  final TextEditingController _emailController = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    _loadData();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Welcome Back, ${widget.loginName}")),
+      );
+    });
+  }
+
+  void _loadData() async {
+    _firstNameController.text = await widget.encryptedPrefs.getString('firstName') ?? '';
+    _lastNameController.text = await widget.encryptedPrefs.getString('lastName') ?? '';
+    _phoneController.text = await widget.encryptedPrefs.getString('phone') ?? '';
+    _emailController.text = await widget.encryptedPrefs.getString('email') ?? '';
+  }
+
+  void _saveData() async {
+    await widget.encryptedPrefs.setString('firstName', _firstNameController.text);
+    await widget.encryptedPrefs.setString('lastName', _lastNameController.text);
+    await widget.encryptedPrefs.setString('phone', _phoneController.text);
+    await widget.encryptedPrefs.setString('email', _emailController.text);
+  }
+
+  void _launchURL(String url) async {
+    if (await canLaunch(url)) {
+      await launch(url);
+    } else {
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(title: Text("Error"), content: Text("Cannot open $url"), actions: [TextButton(onPressed: () => Navigator.pop(context), child: Text("OK"))]),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: Text("Profile Page")),
+      body: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          children: [
+            Text("Welcome Back, ${widget.loginName}", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            TextField(controller: _firstNameController, decoration: InputDecoration(labelText: "First Name")),
+            TextField(controller: _lastNameController, decoration: InputDecoration(labelText: "Last Name")),
+            Row(children: [
+              Flexible(child: TextField(controller: _phoneController, decoration: InputDecoration(labelText: "Phone Number"))),
+              IconButton(icon: Icon(Icons.phone), onPressed: () => _launchURL("tel:${_phoneController.text}")),
+              IconButton(icon: Icon(Icons.message), onPressed: () => _launchURL("sms:${_phoneController.text}")),
+            ]),
+            Row(children: [
+              Flexible(child: TextField(controller: _emailController, decoration: InputDecoration(labelText: "Email Address"))),
+              IconButton(icon: Icon(Icons.mail), onPressed: () => _launchURL("mailto:${_emailController.text}")),
+            ]),
+            ElevatedButton(onPressed: _saveData, child: Text("Save")),
           ],
         ),
       ),
