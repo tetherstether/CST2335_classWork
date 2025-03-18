@@ -39,6 +39,7 @@ class _ShoppingListPageState extends State<ShoppingListPage> {
   final List<TodoItem> _items = [];
   final TextEditingController _itemController = TextEditingController();
   final TextEditingController _quantityController = TextEditingController();
+  TodoItem? _selectedItem;
 
   @override
   void initState() {
@@ -71,34 +72,30 @@ class _ShoppingListPageState extends State<ShoppingListPage> {
     }
   }
 
-  Future<void> _removeItem(int index) async {
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: const Text("Delete Item"),
-          content: const Text("Are you sure you want to delete this item?"),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text("No"),
-            ),
-            TextButton(
-              onPressed: () async {
-                await myDAO.deleteItem(_items[index]);
-                _loadItems(); // Refresh list
-                Navigator.of(context).pop();
-              },
-              child: const Text("Yes"),
-            ),
-          ],
-        );
-      },
-    );
+  Future<void> _removeItem(TodoItem item) async {
+    await myDAO.deleteItem(item);
+    _loadItems(); // Refresh list
+    setState(() {
+      _selectedItem = null;
+    });
+  }
+
+  void _showDetails(TodoItem item) {
+    setState(() {
+      _selectedItem = item;
+    });
+  }
+
+  void _closeDetails() {
+    setState(() {
+      _selectedItem = null;
+    });
   }
 
   @override
   Widget build(BuildContext context) {
+    final isPortrait = MediaQuery.of(context).orientation == Orientation.portrait;
+
     return Scaffold(
       appBar: AppBar(
         title: const Text("To-Do List"),
@@ -134,34 +131,101 @@ class _ShoppingListPageState extends State<ShoppingListPage> {
             ),
             const SizedBox(height: 20),
             Expanded(
-              child: Center( // Centers the content
-                child: _items.isEmpty
-                    ? const Text("There are no items in the list.")
-                    : Column(
-                  mainAxisAlignment: MainAxisAlignment.center, // Centers list vertically
-                  children: [
-                    Expanded(
-                      child: ListView.builder(
-                        shrinkWrap: true, // Prevents extra scrolling issues
-                        itemCount: _items.length,
-                        itemBuilder: (context, index) {
-                          return GestureDetector(
-                            onLongPress: () => _removeItem(index),
-                            child: ListTile(
-                              title: Center( // Center the text in ListTile
-                                child: Text("${index + 1}: ${_items[index].item} - Quantity: ${_items[index].quantity}"),
-                              ),
-                            ),
-                          );
-                        },
+              child: isPortrait
+                  ? _selectedItem == null
+                  ? _items.isEmpty
+                  ? const Center(child: Text("There are no items in the list."))
+                  : ListView.builder(
+                itemCount: _items.length,
+                itemBuilder: (context, index) {
+                  return GestureDetector(
+                    onTap: () => _showDetails(_items[index]),
+                    child: ListTile(
+                      title: Center(
+                        child: Text("${index + 1}: ${_items[index].item} - Quantity: ${_items[index].quantity}"),
                       ),
                     ),
-                  ],
-                ),
+                  );
+                },
+              )
+                  : DetailsPage(
+                item: _selectedItem!,
+                onDelete: _removeItem,
+                onClose: _closeDetails,
+              )
+                  : Row(
+                children: [
+                  Expanded(
+                    flex: 1,
+                    child: ListView.builder(
+                      itemCount: _items.length,
+                      itemBuilder: (context, index) {
+                        return GestureDetector(
+                          onTap: () => _showDetails(_items[index]),
+                          child: ListTile(
+                            title: Center(
+                              child: Text("${index + 1}: ${_items[index].item} - Quantity: ${_items[index].quantity}"),
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                  Expanded(
+                    flex: 1,
+                    child: _selectedItem == null
+                        ? const Center(child: Text("Select an item to view details"))
+                        : SingleChildScrollView(
+                      child: DetailsPage(
+                        item: _selectedItem!,
+                        onDelete: _removeItem,
+                        onClose: _closeDetails,
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class DetailsPage extends StatelessWidget {
+  final TodoItem item;
+  final Function(TodoItem) onDelete;
+  final Function() onClose;
+
+  const DetailsPage({
+    Key? key,
+    required this.item,
+    required this.onDelete,
+    required this.onClose,
+  }) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.all(16.0),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Text("Item: ${item.item}", style: const TextStyle(fontSize: 24)),
+          Text("Quantity: ${item.quantity}", style: const TextStyle(fontSize: 20)),
+          Text("ID: ${item.id}", style: const TextStyle(fontSize: 16)),
+          const SizedBox(height: 20),
+          ElevatedButton(
+            onPressed: () => onDelete(item),
+            child: const Text("Delete"),
+          ),
+          const SizedBox(height: 10),
+          ElevatedButton(
+            onPressed: onClose,
+            child: const Text("Close"),
+          ),
+        ],
       ),
     );
   }
